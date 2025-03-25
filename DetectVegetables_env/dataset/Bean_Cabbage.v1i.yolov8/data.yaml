@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['Bean', 'Cabbage']
+
+roboflow:
+  workspace: yolov8-uiuze
+  project: bean_cabbage
+  version: 1
+  license: MIT
+  url: https://universe.roboflow.com/yolov8-uiuze/bean_cabbage/dataset/1
