@@ -6,6 +6,14 @@
 2. https://fae.moa.gov.tw/theme_list.php?theme=topics&sub_theme=recipe
 
 
+## Database
+採用 MySQL (ver: 8.0) 建立 Users、Ingredients、Recipes、RecipeIngredients 與 Recipe_ratings 等資料綱目
+
+下圖為各表的關聯規則，原檔案: [DB_design.drawio](./DB_design.drawio) 採用 https://app.diagrams.net/ 進行編輯 (暫定)
+![DB_design.drawio.png](./DB_design.drawio.png)
+
+
+
 ## TODO List
 
 1. 實時物件辨識並輸出結果至網站上
