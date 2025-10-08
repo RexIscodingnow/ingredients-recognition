@@ -9,9 +9,14 @@
 ## Database
 採用 MySQL (ver: 8.0) 建立 Users、Ingredients、Recipes、RecipeIngredients 與 Recipe_ratings 等資料綱目
 
+SQL script: [recipes_ingredients.sql](./recipes_ingredients.sql)
+
+
 下圖為各表的關聯規則，原檔案: [DB_design.drawio](./DB_design.drawio) 採用 https://app.diagrams.net/ 進行編輯 (暫定)
 ![DB_design.drawio.png](./DB_design.drawio.png)
 
+下圖為 MySQL workbench 產生的 EER diagram
+![DB_EER_diagram.png](./DB_EER_diagram.png)
 
 
 ## TODO List
