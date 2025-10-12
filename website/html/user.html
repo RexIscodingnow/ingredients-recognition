@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}
+    家常好食 — 會員頁面
+{% endblock %}
+
+
+{% block main_tag_content %}
+<link rel="stylesheet" href="../static/user.css">
+
+<section class="user-profile container">
+    <div class="profile-header">
+        <div class="user-info">
+            <h2>{{ user.username }}</h2>
+            <p class="email">{{ user.email }}</p>
+            <div class="profile-actions">
+                <button class="btn btn-outline" id="btn-edit-profile">編輯資料</button>
+                <button class="btn btn-primary">上傳新食譜</button>
+            </div>
+        </div>
+    </div>
+
+    <hr style="margin: 30px 0;">
+
+    <section class="user-section">
+        <h3>我的收藏食譜</h3>
+        {% if favorites %}
+        <div class="recipe-grid">
+            {% for recipe in favorites %}
+            <div class="recipe-card">
+                <img src="{{ recipe.image_url }}" alt="{{ recipe.title }}">
+                <div class="recipe-info">
+                    <h4>{{ recipe.title }}</h4>
+                    <small>{{ recipe.category }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--muted)">目前還沒有收藏任何食譜～</p>
+        {% endif %}
+    </section>
+
+    <!-- <section class="user-section">
+        <h3>我上傳的食譜</h3>
+        {% if uploads %}
+        <div class="recipe-grid">
+            {% for recipe in uploads %}
+            <div class="recipe-card">
+                <div class="recipe-info">
+                    <h4>{{ recipe.title }}</h4>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <small>{{ recipe.category }}</small>
+                        <a href="{{ url_for('edit_recipe', id=recipe.id) }}" class="btn btn-outline btn-small">編輯</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--muted)">您還沒有上傳任何食譜。</p>
+        {% endif %}
+    </section> -->
+
+    
+
+</section>
+
+<!-- Modal: 編輯資料 -->
+<div class="user-modal-backdrop" id="user-edit-modal">
+    <div class="user-modal" role="dialog" aria-modal="true">
+        <button id="user-edit-close" style="float:right; border:0; background:transparent; font-size:18px;">✕</button>
+        <h3>編輯個人資料</h3>
+
+        <form id="user-edit-form">
+            <div class="user-form-group">
+                <label>使用者名稱</label>
+                <input id="username" type="text" value="{{ user.username }}">
+            </div>
+            <div class="user-form-group">
+                <label>電子郵件</label>
+                <input id="email" type="email" value="{{ user.email }}">
+            </div>
+            <div class="user-form-group">
+                <label>確認密碼</label>
+                <input id="password" type="password" placeholder="請輸入原密碼進行更改">
+            </div>
+            <div class="user-form-group">
+                <label>更新密碼</label>
+                <input id="new-password" type="password" placeholder="請輸入新密碼（選填，若沒有要更新則留空）">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" id="user-edit-cancel">取消</button>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="../static/user.js"></script>
+
+{% endblock %}
