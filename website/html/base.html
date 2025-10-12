@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{% block title %}{% endblock %}</title>
+        <meta name="description" content="家常好食：收錄簡單、快速又美味的食譜。登入以收藏或上傳食譜。" />
+        <link rel="stylesheet" href="../static/home.css">
+    </head>
+    <body>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="background-color:#ffdddd; padding:10px; margin:10px; border-radius:5px;">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <header>
+            <div class="container">
+                <div class="brand">
+                    <div class="logo">食</div>
+                    <div>
+                    <div style="font-weight:800">家常好食</div>
+                    <small style="color:var(--muted); font-size:12px">簡單・快速・美味</small>
+                    </div>
+                </div>
+
+                <nav aria-label="主要選單">
+                    <a href="#">首頁</a>
+                    <a href="#recipes">食譜</a>
+                    <a href="#categories">分類</a>
+                    <a href="#about">關於</a>
+                </nav>
+
+                <div class="spacer"></div>
+
+                <!-- 右上方 登入 / 註冊 按鈕 -->
+                <div class="auth">
+                    {% if user.is_authenticated %}
+                    <form action="{{ url_for('logout') }}" method="get" id="logout-form" style="display:inline;">
+                        <button type="submit" class="btn btn-outline">登出</button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-outline" id="btn-login">登入</button>
+                    <button class="btn btn-primary" id="btn-register">註冊</button>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+        <main>
+            {% block main_tag_content %}
+            {# main tag content #}
+            {% endblock %}
+        </main>
+
+        <footer>
+            <div class="container" style="max-width:1100px;">
+                <small>家常好食。讓您吃的過癮！</small>
+            </div>
+        </footer>
+
+        <!-- Modal: 登入 / 註冊 -->
+        <div class="modal-backdrop" id="modal">
+            <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+                <button style="float:right; border:0; background:transparent; font-size:18px; cursor:pointer" id="modal-close">✕</button>
+                <h3 id="modal-title">登入</h3>
+                <form id="auth-form">
+                    <div class="form-group" id="username-group" style="display:none;">
+                        <label for="username">使用者名稱</label>
+                        <input id="username" type="text" placeholder="請輸入使用者名稱" />
+                    </div>
+                    <div class="form-group">
+                        <label for="email">電子郵件</label>
+                        <input id="email" type="email" required placeholder="name@example.com" />
+                    </div>
+                    <div class="form-group">
+                        <label for="password">密碼</label>
+                        <input id="password" type="password" required placeholder="請輸入密碼" />
+                    </div>
+                    <div class="modal-actions" style="display:flex; justify-content:space-between;">
+                        <button type="button" class="btn btn-outline" id="switch-to-register">前往註冊</button>
+                        <button type="button" class="btn btn-outline" id="switch-to-forgot-pwd">忘記密碼？</button>
+                        <button type="submit" class="btn btn-primary">送出</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script src="../static/home.js"></script>
+    </body>
+</html>
