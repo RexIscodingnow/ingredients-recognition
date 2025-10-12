@@ -23,3 +23,14 @@ def insert_data(tablename: str, data: dict[str, int | float | str]):
            columns=columns,
            values=values)
 
+
+def update_data(tablename: str, data: dict[str, int | float | str], target: dict[str, int | float | str]):
+    conditions = []
+    for col, val in target.items():
+        conditions.append([col, "=", val])
+
+    update(cursor=cursor,
+           tablename=tablename,
+           new_values=data,
+           conditions=conditions)
+
