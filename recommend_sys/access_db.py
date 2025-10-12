@@ -269,23 +269,23 @@ def insert(cursor: MySQLCursorAbstract,
         for col in columns:
             if not _VALID_IDENTIFIER.match(col):
                 raise ValueError(f"Invalid column name: {col}")
-        columns = "(" + ",".join([f"`{col}`" for col in columns]) + ")"
+        column_names = "(" + ",".join([f"`{col}`" for col in columns]) + ")"
     else:
-        columns = ""
+        column_names = ""
 
     column_params = "(" + ", ".join(["%s"] * len(columns)) + ")"
     sql_script = f"""
-                 INSERT INTO `{tablename}` {columns} VALUES {column_params};
+                 INSERT INTO `{tablename}` {column_names} VALUES {column_params};
                  """
-    print(sql_script)
-    cursor.executemany(sql_script, values)
+    # print(sql_script, values)
+    cursor.executemany(sql_script, [values])
     db.commit()    # Commits current transaction.
 
 
 def update(cursor: MySQLCursorAbstract,
            tablename: str,
            new_values: dict[str, str | int | float],
-           conditions: Iterable[Sequence[str | int | float]] = None) -> bool:
+           conditions: Iterable[Sequence[str | int | float]] = None):
     """Update command
 
     Args:
@@ -378,10 +378,10 @@ def update(cursor: MySQLCursorAbstract,
 if __name__ == "__main__":
     schama_info = show_table_info(cursor, schema_name="recipes_ingredients", show_columns=True)
 
-    import pandas as pd
+    # import pandas as pd
 
-    recipe_info = pd.read_csv("未命名的試算表 - 工作表1.csv")
-    r_names = recipe_info["食譜名"]
+    # recipe_info = pd.read_csv("未命名的試算表 - 工作表1.csv")
+    # r_names = recipe_info["食譜名"]
     # r_ingredients = recipe_info["食材"]
     # cooking_step = recipe_info["料理步驟"]
     # r_url = recipe_info["食譜網站資訊"]
