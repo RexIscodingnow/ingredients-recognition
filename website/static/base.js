@@ -4,9 +4,10 @@ const btnRegister = document.getElementById('btn-register');
 const modalClose = document.getElementById('modal-close');
 const title = document.getElementById('modal-title');
 const switchBtn = document.getElementById('switch-to-register');
+const forgotPwdBtn = document.getElementById('switch-to-forgot-pwd');
 const authForm = document.getElementById('auth-form');
-const logoutForm = document.getElementById('logout-form');
 const usernameGroup = document.getElementById('username-group');
+const passwordForm = document.getElementById('password');
 
 let currentMode = 'login';
 
@@ -31,17 +32,32 @@ function showMessage(message, isSuccess = true) {
     msgBox.style.color = isSuccess ? 'green' : 'red';
 }
 
+// 指定欄位顯示
 function setModalContent(mode) {
     if (mode === 'login') {
-        title.textContent = '登入';
+        title.textContent = '登入';         // email + password
         usernameGroup.style.display = 'none';
+        document.getElementById('password').parentElement.style.display = 'block';
+        document.getElementById('email').parentElement.style.display = 'block';
+        forgotPwdBtn.style.display = 'block';
         switchBtn.textContent = '前往註冊';
-    } else {
+    } else if (mode === 'register') {       // all
         title.textContent = '註冊';
         usernameGroup.style.display = 'block';
+        document.getElementById('password').parentElement.style.display = 'block';
+        document.getElementById('email').parentElement.style.display = 'block';
+        forgotPwdBtn.style.display = 'none';
+        switchBtn.style.display = 'inline-block';
         switchBtn.textContent = '已有帳號？前往登入';
+    } else if (mode === 'forgot-pwd') {     // only email
+        title.textContent = '忘記密碼';
+        usernameGroup.style.display = 'none';
+        document.getElementById('password').parentElement.style.display = 'none';
+        document.getElementById('email').parentElement.style.display = 'block';
+        switchBtn.style.display = 'inline-block';
+        switchBtn.textContent = '返回登入';
+        forgotPwdBtn.style.display = 'none';
     }
-
     showMessage("");
 }
 
@@ -54,37 +70,9 @@ function openModal(mode) {
 }
 
 
-/*
-function openModal(mode) {
-    modal.style.display = 'flex';
-    currentMode = mode;
-
-    if (mode === 'login') {
-        title.textContent = '登入';
-        usernameGroup.style.display = 'none';
-        switchBtn.textContent = '前往註冊';
-        authForm.onsubmit = (e) => {
-            e.preventDefault();
-            // alert('登入成功：' + document.getElementById('email').value);
-            clearFields();
-            modal.style.display = 'none';
-        }
-    } else {
-        title.textContent = '註冊';
-        usernameGroup.style.display = 'block';
-        switchBtn.textContent = '已有帳號？前往登入';
-        authForm.onsubmit = (e) => {
-            e.preventDefault();
-            // alert('註冊完成：' + document.getElementById('username').value);
-            clearFields();
-            modal.style.display = 'none';
-        }
-    }
-}
-*/
-
 btnLogin.addEventListener('click', () => openModal('login'));
 btnRegister.addEventListener('click', () => openModal('register'));
+forgotPwdBtn.addEventListener('click', () => openModal('forgot-pwd'));
 modalClose.addEventListener('click', () => modal.style.display='none');
 switchBtn.addEventListener('click', () => {
     openModal(currentMode === 'login' ? 'register' : 'login');
@@ -102,10 +90,13 @@ authForm.addEventListener('submit', async (e) => {
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value.trim();
 
-    if (!email || !password || (currentMode === 'register' && !username)) {
+    if ((currentMode === 'register' && (!email|| !username || !password)) ||
+        (currentMode === 'login' && (!email || !password)) ||
+        (currentMode === 'forgot-pwd' && !email)) {
         showMessage('⚠️ 所有欄位皆為必填', false);
         return;
     }
+
 
     const data = {
         username: username,
@@ -113,8 +104,15 @@ authForm.addEventListener('submit', async (e) => {
         password: password
     };
 
-    const endpoint = currentMode === 'login' ? '/login' : '/register';
-    
+    let endpoint;
+    if (currentMode === 'login') {
+        endpoint = '/login';
+    } else if (currentMode === 'register') {
+        endpoint = '/register';
+    } else {
+        endpoint = '/forgot-pwd';
+    }
+
     try {
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -125,7 +123,6 @@ authForm.addEventListener('submit', async (e) => {
         console.log(currentMode)
 
         const result = await response.json();
-        // alert(result.message);
 
         if (result.success) {
             // modal.style.display = 'none';
@@ -136,7 +133,7 @@ authForm.addEventListener('submit', async (e) => {
                 if (result.redirect_url) {
                     window.location.href = result.redirect_url;
                 }
-            }, 800);
+            }, 2500);
         } else {
             showMessage(result.message || '操作失敗，請再試一次', false);
         }
