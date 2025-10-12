@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{% block title %}{% endblock %}</title>
         <meta name="description" content="家常好食：收錄簡單、快速又美味的食譜。登入以收藏或上傳食譜。" />
-        <link rel="stylesheet" href="../static/home.css">
+        <link rel="stylesheet" href="../static/base.css">
     </head>
     <body>
         {% with messages = get_flashed_messages() %}
@@ -28,7 +28,7 @@
                 </div>
 
                 <nav aria-label="主要選單">
-                    <a href="#">首頁</a>
+                    <a href="/">首頁</a>
                     <a href="#recipes">食譜</a>
                     <a href="#categories">分類</a>
                     <a href="#about">關於</a>
@@ -39,6 +39,9 @@
                 <!-- 右上方 登入 / 註冊 按鈕 -->
                 <div class="auth">
                     {% if user.is_authenticated %}
+                    <form action="{{ url_for('user_page') }}" method="get" id="user-form" style="display:inline;">
+                        <button type="submit" class="btn btn-outline">會員：{{ user.username }}</button>
+                    </form>
                     <form action="{{ url_for('logout') }}" method="get" id="logout-form" style="display:inline;">
                         <button type="submit" class="btn btn-outline">登出</button>
                     </form>
@@ -78,7 +81,7 @@
                     </div>
                     <div class="form-group">
                         <label for="password">密碼</label>
-                        <input id="password" type="password" required placeholder="請輸入密碼" />
+                        <input id="password" type="password" placeholder="請輸入密碼" />
                     </div>
                     <div class="modal-actions" style="display:flex; justify-content:space-between;">
                         <button type="button" class="btn btn-outline" id="switch-to-register">前往註冊</button>
@@ -88,6 +91,6 @@
                 </form>
             </div>
         </div>
-        <script src="../static/home.js"></script>
+        <script src="../static/base.js"></script>
     </body>
 </html>
