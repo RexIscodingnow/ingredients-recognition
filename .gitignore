@@ -1,1 +1,7 @@
+detect_ingredients/__pycache__
 recommend_sys/.env
+recommend_sys/__pycache__
+website/__pycache__
+website/.env
+Lib
+Scripts
