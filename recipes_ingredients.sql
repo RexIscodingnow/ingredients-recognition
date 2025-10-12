@@ -165,9 +165,9 @@ insert into `Recipes` (`recipe_name`, `cooking_step`) values
 7. 青椒肉絲完成囉～');
 
 
-
 select * from `Users`;
 select * from `Ingredients`;
 select * from `Recipes`;
-
+select * from `RecipeIngredients`;
+select * from `Recipe_ratings`;
 
