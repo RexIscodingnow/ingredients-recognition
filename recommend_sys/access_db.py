@@ -1,6 +1,7 @@
 import os
 import re
 import dotenv
+import pandas as pd
 import mysql.connector as conn
 
 from mysql.connector.abstracts import MySQLCursorAbstract
@@ -18,13 +19,12 @@ db = conn.connect(
 
 cursor = db.cursor()
 _VALID_IDENTIFIER = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
-_ALLOWED_OPERATORS = {'=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN', 'NOT IN', 'IS', 'IS NOT'}
+_ALLOWED_OPERATORS = {'=', '!=', '>', '>=', '<', '<=', 'LIKE', 'IN'}
 _ALLOWED_LOGICAL = {'AND', 'OR'}
 
 
 def show_table_info(cursor: MySQLCursorAbstract, schema_name: str = "", *, show_columns=False):
-    """
-    List the table names and column names of all databases (schema) and print on the terminal.
+    """List the table names and column names of all databases (schemas) and print them in the terminal.
 
     References:
         CREATE SCHEMA is a synonym for CREATE DATABASE as of MySQL 5.0.2.
@@ -33,7 +33,7 @@ def show_table_info(cursor: MySQLCursorAbstract, schema_name: str = "", *, show_
     Args:
         cursor: MySQL cursor object.
         schema_name: The name of the schema. If not provided, all schemas will be listed.
-        show_columns: List all columns name of the tables if it set to `True`.
+        show_columns: List all column names of the tables if it set to `True`.
 
     Returns:
         schema_info: The dictionary containing all databases,
@@ -52,7 +52,7 @@ def show_table_info(cursor: MySQLCursorAbstract, schema_name: str = "", *, show_
         >>> schama_info
         ...
         ...
-        ... (The schema information above has been omitted.)
+        # ... (output omitted)
 
         [Schema] world
             Table: city
@@ -137,12 +137,12 @@ def _select(cursor: MySQLCursorAbstract,
             tablename: str, 
             columns: Sequence[str] = None, 
             conditions: str = "",
-            params: Sequence = ()) -> Sequence:
+            params: Sequence = ()) -> Sequence[tuple]:
     if columns is not None and len(columns) > 0:
         for col in columns:
             if not _VALID_IDENTIFIER.match(col):
                 raise ValueError(f"Invalid column name: {col}")
-        columns = "(" + ",".join([f"`{col}`" for col in columns]) + ")"
+        columns = ",".join([f"`{col}`" for col in columns])
     else:
         columns = "*"
 
@@ -151,7 +151,7 @@ def _select(cursor: MySQLCursorAbstract,
         sql_script += " WHERE " + conditions
     sql_script += ';'
 
-    print(sql_script, "\n", params)
+    # print(sql_script, "\n", params)
     cursor.execute(sql_script, params)
     return [item for item in cursor]
 
@@ -160,7 +160,7 @@ def select(cursor: MySQLCursorAbstract,
            tablename: str,
            columns: Sequence[str] = None,
            conditions: Iterable[Sequence[str | int | float]] = None
-           ) -> Sequence:
+           ) -> Sequence[tuple]:
     """Select command
 
     Args:
@@ -176,7 +176,7 @@ def select(cursor: MySQLCursorAbstract,
 
     Examples:
         ```
-        /* This is an example of a MySQL SELECT command. */
+        /* This is an example of a MySQL `SELECT` command. */
         SELECT * FROM `Ingredients`
         WHERE ingredient_name = '味精' OR ingredient_name LIKE '雞%' OR ingredient_name LIKE '蒜%';
         ```
@@ -201,11 +201,12 @@ def select(cursor: MySQLCursorAbstract,
         [(48, '味精'), (41, '蒜末'), (36, '蒜頭'), (31, '雞扒/雞排'), (50, '雞蛋')]
         ```
     """
-    if columns is not None and not isinstance(columns, Sequence):
+    if columns is not None and (isinstance(columns, str) or not isinstance(columns, Sequence)):
         raise TypeError("TypeError - The argument `columns` must be a sequence.")
-    
+
     if conditions is None or not conditions:
         return _select(cursor, tablename, columns, "")
+
     if not isinstance(conditions, Iterable):
         raise TypeError("TypeError - The argument `conditions` must be a iterable sequence.")
 
@@ -220,7 +221,7 @@ def select(cursor: MySQLCursorAbstract,
             )
 
         col, op, val = cond[0], cond[1], cond[2]
-        op = op.upper()
+        op = op.upper().strip()
         logical_op = cond[3].upper() if len(cond) == 4 else "AND"
 
         if not _VALID_IDENTIFIER.match(col):
@@ -230,8 +231,17 @@ def select(cursor: MySQLCursorAbstract,
         if logical_op not in _ALLOWED_LOGICAL:
             raise ValueError(f"Invalid logical operator: {logical_op} is not allowed.")
 
-        expr = f"`{col}` {op} %s"
-        params.append(val)
+        if op == "IN":
+            if not isinstance(val, (list, tuple)) or len(val) == 0:
+                raise ValueError("IN operator requires a non-empty list/tuple as value")
+
+            placeholders = ",".join(["%s"] * len(val))
+            expr = f"`{col}` IN ({placeholders})"
+            params.extend(val)
+        else:
+            expr = f"`{col}` {op} %s"
+            params.append(val)
+
         if i < len(conditions) - 1:
             expr += f" {logical_op}"
         parts.append(expr)
@@ -243,7 +253,7 @@ def select(cursor: MySQLCursorAbstract,
 def insert(cursor: MySQLCursorAbstract,
            tablename: str,
            columns: Sequence[str] = None,
-           values: Iterable[str | int | float] = []):
+           values: Sequence[Sequence[str | int | float]] = []):
     """Insert command
 
     Args:
@@ -274,11 +284,9 @@ def insert(cursor: MySQLCursorAbstract,
         column_names = ""
 
     column_params = "(" + ", ".join(["%s"] * len(columns)) + ")"
-    sql_script = f"""
-                 INSERT INTO `{tablename}` {column_names} VALUES {column_params};
-                 """
-    # print(sql_script, values)
-    cursor.executemany(sql_script, [values])
+    sql_script = f"INSERT IGNORE INTO `{tablename}` {column_names} VALUES {column_params};"
+    # print(sql_script, "\n", values)
+    cursor.executemany(sql_script, values)
     db.commit()    # Commits current transaction.
 
 
@@ -358,8 +366,17 @@ def update(cursor: MySQLCursorAbstract,
             if logical_op not in _ALLOWED_LOGICAL:
                 raise ValueError(f"Invalid logical operator: {logical_op} is not allowed.")
 
-            expr = f"`{col}` {op} %s"
-            cond_params.append(val)
+            if op == "IN":
+                if not isinstance(val, (list, tuple)) or len(val) == 0:
+                    raise ValueError("IN operator requires a non-empty list/tuple as value")
+
+                placeholders = ",".join(["%s"] * len(val))
+                expr = f"`{col}` IN ({placeholders})"
+                params.extend(val)
+            else:
+                expr = f"`{col}` {op} %s"
+                params.append(val)
+
             if i < len(conditions) - 1:
                 expr += f" {logical_op}"
             parts.append(expr)
@@ -370,21 +387,186 @@ def update(cursor: MySQLCursorAbstract,
     sql_script += ';'
     params.extend(cond_params)
 
-    print(sql_script, f"\n{params} ")
+    # print(sql_script, f"\n{params} ")
     cursor.executemany(sql_script, [params])
     db.commit()
+
+
+def add_recipe_info(df: pd.DataFrame):
+    """Add the multiple informations of recipes by `pandas.DataFrame`.
+    Execute the `insert()` to insert these informations for 'Recipes', 'Ingredients', and 'RecipeIngredients' tables, respectively.
+
+    Args:
+        df: A `pandas.DataFrame` contains the recipe informations such as recipe name, cooking step, reference URL, and ingredients.
+    """
+    columns = ["食譜名", "食材", "料理步驟", "食譜網站資訊"]
+
+    if len(columns) != len(df.columns) or not all([col in df.columns for col in columns]):
+        raise Exception(f"It must contains: {columns} column name")
+
+    #TODO: Check it !
+    table_cols_mp = {
+        "Recipes": ["cooking_step", "recipe_info_url", "recipe_name"],
+        "Ingredients": ["ingredient_name"],
+        "RecipeIngredients": ["recipe_id", "ingredient_id"]
+    }
+    insert_recipes = []
+    ingredient_set = set()
+    recipe_ingred_mp = {}   # Name of recipe --> list of ingredients
+
+    for idx, row in df.iterrows():
+        r_name = row["食譜名"]
+        ingredients = [i_name.strip() for i_name in row["食材"].split(",")]
+        ingredient_set.update(ingredients)
+        insert_recipes.append([row["料理步驟"], row["食譜網站資訊"], r_name])
+        recipe_ingred_mp[r_name] = ingredients
+    insert_ingredients = list(ingredient_set)
+
+    insert(cursor,
+           tablename="Recipes",
+           columns=table_cols_mp["Recipes"],
+           values=insert_recipes)
+    insert(cursor,
+           tablename="Ingredients",
+           columns=table_cols_mp["Ingredients"],
+           values=[insert_ingredients])
+
+    r_names = df["食譜名"].unique().tolist()
+    i_names = list(ingredient_set)
+    recipe_res = select(cursor,
+                        tablename="Recipes",
+                        columns=["recipe_id", "recipe_name"],
+                        conditions=[["recipe_name", "IN", r_names]])
+    ingred_res = select(cursor,
+                        tablename="Ingredients",
+                        conditions=[["ingredient_name", "IN", i_names]])
+
+    recipe_id_mp = {name: r_id for r_id, name in recipe_res}    # recipe name --> recipe_id
+    ingred_id_mp = {name: i_id for i_id, name in ingred_res}    # ingredient name --> ingredient_id
+    insert_recipe_ingredients = []
+
+    for recipe_name, ingredient_names in recipe_ingred_mp.items():
+        r_id = recipe_id_mp.get(recipe_name)
+        if r_id is None:
+            continue
+
+        for i_name in ingredient_names:
+            i_id = ingred_id_mp.get(i_name)
+            if i_id is None:
+                continue
+
+            insert_recipe_ingredients.append([r_id, i_id])
+
+    insert(cursor,
+           tablename="RecipeIngredients",
+           columns=table_cols_mp["RecipeIngredients"],
+           values=insert_recipe_ingredients)
+
+    print("Done !")
+
+
+def update_multiRecipes(data: pd.DataFrame):
+    #TODO: Complete the function
+    if len(columns) != len(data.columns) or not all([col in data.columns for col in columns]):
+        raise Exception(f"data-type: {type(data)}. It must contains: {columns} columns names.")
+
+    recipe_ingred_mp = {}
+    columns = ["食譜名", "食材", "料理步驟", "食譜網站資訊"]
+
+    for idx, row in data.iterrows():
+        r_name = row["食譜名"]
+        ingredients = [i_name.strip() for i_name in row["食材"].split(",")]
+        recipe_ingred_mp[r_name] = {
+            "ingredients": ingredients,
+            "cooking_step": row["料理步驟"],
+            "recipe_url": row["食譜網站資訊"]
+        }
+
+    # empty: doing noting
+    # non-empty: updating data
+    for r_name, values in recipe_ingred_mp:
+        pass
+
+
+def get_abspath_files(path: str):
+    path = os.path.abspath(path)
+    return [os.path.abspath(entry.path) for entry in os.scandir(path) if entry.is_file()]
+
+
+# @functools.cache
+def merge_csv_to_df(files: Iterable[str]) -> pd.DataFrame:
+    """
+    Concatenate multiple `pandas.Dataframe` objects from a list of csv file paths.
+    
+    Parameter:
+        - files: a sequence of relative/absolute paths.
+    """
+    df_lst = [pd.read_csv(csv_file) for csv_file in files]    
+    df_merged = pd.concat(df_lst, ignore_index=True)
+    return df_merged
 
 
 if __name__ == "__main__":
     schama_info = show_table_info(cursor, schema_name="recipes_ingredients", show_columns=True)
 
-    # import pandas as pd
+    # recipe_info = pd.read_csv("recipes (1).csv")
+    # add_recipe_info(recipe_info)
 
-    # recipe_info = pd.read_csv("未命名的試算表 - 工作表1.csv")
-    # r_names = recipe_info["食譜名"]
-    # r_ingredients = recipe_info["食材"]
-    # cooking_step = recipe_info["料理步驟"]
-    # r_url = recipe_info["食譜網站資訊"]
+    """
+    # Check that all recipes and ingredients have been correctly inserted into the DB.
+    reci = select(cursor, 
+                  tablename="Recipes", 
+                  columns=["recipe_id", "recipe_name"])
+    ingr = select(cursor, 
+                  tablename="Ingredients")
+    re_in = select(cursor, 
+                   tablename="RecipeIngredients")    
+    df_DB_R = pd.DataFrame(reci, columns=["recipe_id", "recipe_name"])
+    df_DB_I = pd.DataFrame(ingr, columns=["ingredient_id", "ingredient_name"])
+    df_DB_RI = pd.DataFrame(re_in, columns=["recipe_id", "ingredient_id"])
+
+    df_recipe_info = merge_csv_to_df([f"recipes_{i}.csv" for i in range(6)])
+    df_recipe_info = df_recipe_info.drop_duplicates(subset=['食譜名'])
+    
+    ingredient_set = set()
+    recipe_ingred_mp = {}   # Name of recipe --> list of ingredients
+    for idx, row in df_recipe_info.iterrows():
+        r_name = row["食譜名"]
+        ingredients = [i_name.strip() for i_name in row["食材"].split(",")]
+        ingredient_set.update(ingredients)
+        recipe_ingred_mp[r_name] = ingredients
+
+    r_names = [name for name in recipe_ingred_mp.keys()]
+    i_names = list(ingredient_set)
+
+    print(all(r in r_names for r in df_DB_R["recipe_name"].tolist()))
+    print(all(i in ingredient_set for i in df_DB_I["ingredient_name"].tolist()))
+    """
+
+
+    # r_names = recipe_info["食譜名"].tolist()
+    # r_ingredients = recipe_info["食材"].tolist()
+    # cooking_step = recipe_info["料理步驟"].tolist()
+    # r_url = recipe_info["食譜網站資訊"].tolist()
+
+    # recipe_cols = ["cooking_step", "recipe_info_url", "recipe_name"]
+    # recipe_values = []
+    # for i in range(len(r_names)):
+    #     recipe_values.append([cooking_step[i], r_url[i], r_names[i]])
+
+    # s = set()
+    # for i in range(len(r_ingredients)):
+    #     s.update(r_ingredients[i].split(', '))
+
+    # s.remove('雞蛋')
+    # s.remove('胡椒')
+    # s.remove('香油')
+    # s.remove('醬油')
+    # s.remove('蔥')
+    # ingredients = [[i] for i in s]
+    # print(ingredients)
+    # insert(cursor, tablename="Recipes", columns=recipe_cols, values=recipe_values)
+    # insert(cursor, tablename="Ingredients", columns=["ingredient_name"], values=ingredients)
 
     # for name in r_names:
     #     r_step = recipe_info[recipe_info["食譜名"] == name]["料理步驟"].to_string(index=False)
@@ -429,25 +611,33 @@ if __name__ == "__main__":
     # }
 
     # recipe_name = [name for name in recipe.keys()]
+    # recipe_name = r_names
     # recipe_ids = []
     # insert_data: dict[str, list] = {}
+    # tmp_ingredients = set()
 
     # for r in recipe_name:
-    #     id = _select(cursor, 
-    #                 tablename="Recipes", 
-    #                 columns="recipe_id", 
-    #                 conditions=f"`recipe_name` = '{r}'")
-    #     id = id[0][0]
+    #     recipe_query = select(cursor, 
+    #                           tablename="Recipes", 
+    #                           columns=["recipe_id"], 
+    #                           conditions=[["recipe_name", "=", r]])
+    #     id = recipe_query[0][0]
     #     recipe_ids.append(id)
+    #     ingredients = recipe_info[recipe_info["食譜名"] == r]["食材"].to_string(index=False)
 
-    #     insert_data[id] = []
-    #     for ingredient in recipe[r]:
-    #         ingredient_id = _select(cursor, 
+    #     if id not in insert_data.keys():
+    #         insert_data[id] = []
+
+    #     for ingredient in ingredients.split(', '):
+    #         ingredient_id = select(cursor, 
     #                                tablename="Ingredients", 
-    #                                columns="ingredient_id", 
-    #                                conditions=f"`ingredient_name`='{ingredient}'")
-    #         ingredient_id = ingredient_id[0][0]
-    #         insert_data[id].append(ingredient_id)
+    #                                columns=["ingredient_id"], 
+    #                                conditions=[["ingredient_name", "=", ingredient]])
+    #         if len(ingredient_id) > 0:
+    #             ingredient_id = ingredient_id[0][0]
+    #             insert_data[id].append(ingredient_id)
+    #         else:
+    #             tmp_ingredients.add(ingredient)
 
     # print(insert_data)
 
@@ -457,6 +647,11 @@ if __name__ == "__main__":
     #     for i_id in ingredient_ids:
     #         values.append([recipe_id, i_id])
 
-    #     insert(cursor, tablename="RecipeIngredients", columns=("recipe_id", "ingredient_id"), values=values)
+    #     print(values)
 
+    #     try:
+    #         insert(cursor, tablename="RecipeIngredients", columns=("recipe_id", "ingredient_id"), values=values)
+
+    #     except Exception as e:
+    #         print(f"Insert error: {e}")
 
