@@ -20,18 +20,51 @@
         </div>
     </div>
 
-    <hr style="margin: 30px 0;">
+    <section class="user-section">
+        <h3>食譜評分</h3>
+        <form id="rating-form" action="{{ url_for('submit_rating') }}" method="post">
+            <div class="user-form-group">
+                <label for="recipe">選擇要評分的食譜</label>
+                <select id="recipe" name="recipe_id" required>
+                    {% for recipe in all_recipes %}
+                        <option value="{{ recipe.recipe_id }}">{{ recipe.recipe_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
+            <div class="user-form-group">
+                <label for="rating">分數 (1 ~ 5)</label>
+                <select id="rating" name="rating" required>
+                    <option value="">請選擇</option>
+                    <option value="1">1 - 很差</option>
+                    <option value="2">2 - 普通</option>
+                    <option value="3">3 - 還不錯</option>
+                    <option value="4">4 - 很好</option>
+                    <option value="5">5 - 超讚！</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">送出評分</button>
+            </div>
+        </form>
+
+        {% if rating_message %}
+            <p style="color: var(--primary); margin-top: 10px;">{{ rating_message }}</p>
+        {% endif %}
+    </section>
+
+    <hr style="margin: 30px 0;">
     <section class="user-section">
         <h3>我的收藏食譜</h3>
+
         {% if favorites %}
         <div class="recipe-grid">
             {% for recipe in favorites %}
             <div class="recipe-card">
-                <img src="{{ recipe.image_url }}" alt="{{ recipe.title }}">
+                <a href="{{ recipe.recipe_info_url }}">{{ recipe.recipe_name }} 的相關網址資訊</a>
                 <div class="recipe-info">
-                    <h4>{{ recipe.title }}</h4>
-                    <small>{{ recipe.category }}</small>
+                    <h4>{{ recipe.recipe_name }}</h4>
                 </div>
             </div>
             {% endfor %}
@@ -61,8 +94,6 @@
         <p style="color:var(--muted)">您還沒有上傳任何食譜。</p>
         {% endif %}
     </section> -->
-
-    
 
 </section>
 
