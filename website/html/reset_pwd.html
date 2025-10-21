@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}
+    家常好食 - 重設密碼
+{% endblock %}
+
+
+{% block main_tag_content %}
+<section class="hero">
+    <div class="hero-inner">
+        <div class="hero-card" style="max-width:480px; margin:auto;">
+
+        <h1 style="font-size:24px; margin-bottom:10px;">重設密碼</h1>
+        <p style="color:var(--muted); margin-bottom:20px;">
+            請輸入你的電子郵件以設定新密碼。
+        </p>
+
+        <form method="POST" action="#">
+            <div class="form-group">
+                <label for="new-password">新密碼</label>
+                <input type="password" id="new-password" name="new_password" placeholder="輸入新密碼" required>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm-password">確認新密碼</label>
+                <input type="password" id="confirm-password" name="confirm_password" placeholder="再次輸入新密碼" required>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">確認更改</button>
+                <a href="/login" class="btn btn-outline">返回登入</a>
+            </div>
+        </form>
+
+        </div>
+    </div>
+</section>
+<script src="../static/reset_pwd.js"></script>
+
+{% endblock %}

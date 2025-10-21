@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}
+    家常好食 — 搜尋結果
+{% endblock %}
+
+{% block main_tag_content %}
+
+<link rel="stylesheet" href="../static/query_result.css">
+
+<center>
+    <h2>搜尋結果</h2>
+</center>
+<p style="color:var(--muted); text-align:center; margin-bottom:20px;">
+    共找到 {{ all_recipes|length }} 道食譜：
+</p>
+
+<section class="search-results container">
+
+    {% if all_recipes %}
+        <div class="recipe-grid">
+            {% for recipe in all_recipes %}
+            <div class="recipe-card" data-id="{{ recipe.recipe_id }}" 
+                 data-name="{{ recipe.recipe_name }}" 
+                 data-step="{{ recipe.cooking_step }}" 
+                 data-img="{{ recipe.recipe_info_url or 'https://via.placeholder.com/300x200?text=No+Image' }}">
+                 <img src="{{ recipe.recipe_info_url or 'https://via.placeholder.com/300x200?text=No+Image' }}" 
+                     alt="{{ recipe.recipe_name }}">
+                <div class="recipe-info">
+                    <h3>{{ recipe.recipe_name }}</h3>
+                    <p class="step-preview">
+                        {{ recipe.cooking_step[:100] }}{% if recipe.cooking_step|length > 100 %}...{% endif %}
+                    </p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p style="margin-top:20px; color:var(--muted)">很抱歉，沒有找到符合搜尋條件的食譜。</p>
+    {% endif %}
+
+</section>
+
+<!-- Modal：顯示完整食譜 -->
+<div class="recipe-modal-backdrop" id="recipe-modal">
+    <div class="recipe-modal">
+        <button id="modal-close" class="close-btn">✕</button>
+        <img id="modal-img" src="" alt="食譜圖片">
+        <h2 id="modal-title"></h2>
+        <p id="modal-steps"></p>
+    </div>
+</div>
+
+<script src="../static/query_result.js"></script>
+
+{% endblock %}
+
