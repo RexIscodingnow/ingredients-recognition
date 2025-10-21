@@ -1,13 +1,20 @@
 from recommend_sys.access_db import cursor, select, insert, update
 
 
-def query(tablename: str, target: dict[str, int | float | str]):
+def query(tablename: str,
+          target: dict[str, int | float | str] = {},
+          columns: list = [],
+          fuzzy_search: bool = False):
     conditions = []
     for col, val in target.items():
-        conditions.append([col, "=", val])
+        if fuzzy_search:
+            conditions.append([col, "LIKE", val])
+        else:
+            conditions.append([col, "=", val])
 
     return select(cursor=cursor,
                   tablename=tablename,
+                  columns=columns,
                   conditions=conditions)
 
 
@@ -21,7 +28,7 @@ def insert_data(tablename: str, data: dict[str, int | float | str]):
     insert(cursor=cursor,
            tablename=tablename,
            columns=columns,
-           values=values)
+           values=[values])
 
 
 def update_data(tablename: str, data: dict[str, int | float | str], target: dict[str, int | float | str]):
