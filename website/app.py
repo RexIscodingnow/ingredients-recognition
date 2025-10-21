@@ -19,16 +19,18 @@ from flask_login import (
 )
 from flask_mail import Message
 from Users import User
+from RecipesIngredients import *
+
 import config
 import access_db
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    '''
+    """
     回傳給 LoginManager 底下的 user_loader
     登入時要做驗證使用者 der~
-    '''
+    """
     # 回傳使用者資訊
     query_seq = access_db.query(tablename="Users", target={"user_id": user_id})
     if len(query_seq) == 0:
@@ -45,6 +47,7 @@ def load_user(user_id):
     )
     user.hashed_password = password
     return user
+
 
 def sendEmail(subjectMsg='', email=None, filename='', token=None):
     """Send email
@@ -67,6 +70,36 @@ def sendEmail(subjectMsg='', email=None, filename='', token=None):
 @app.route("/")
 def home():
     return render_template("home.html", user=current_user)
+
+
+@app.route("/search", methods=["POST"])
+def search():
+    data = request.get_json()
+    keyword = data.get("q", "").strip()
+
+    # 查詢資料庫（示例）
+    results = access_db.query(
+        tablename="Recipes",
+        target={"recipe_name": f"%{keyword}%"},
+        fuzzy_search=True
+    )
+    if not results:
+        return jsonify(success=False, message="找不到相關食譜")
+
+    # 成功的話可回傳結果或導向新頁面
+    return jsonify(success=True, message=f"找到 {len(results)} 筆結果", data=results)
+
+@app.route("/result")
+def query_result():
+    keyword = request.args.get('q', 'No input')
+    recipes = access_db.query(
+        tablename="Recipes",
+        target={"recipe_name": f"%{keyword}%"},
+        fuzzy_search=True
+    )
+    recipe_lst = [Recipe(recipe_id=r[0], recipe_name=r[1], recipe_info_url=r[2], cooking_step=r[3]) for r in recipes]
+
+    return render_template("query_result.html", user=current_user, all_recipes=recipe_lst)
 
 
 @app.route("/login", methods=["POST"])
@@ -179,7 +212,53 @@ def logout():
 @app.route("/user")
 @login_required
 def user_page():
-    return render_template("user.html", user=current_user)
+    recipe_seq = access_db.query(tablename="Recipes")
+    recipe_set = set()
+
+    for recipe in recipe_seq:
+        r = Recipe(recipe_id=recipe[0],
+                   recipe_name=recipe[1],
+                   recipe_info_url=recipe[2],
+                   cooking_step=recipe[3])
+        recipe_set.add(r)
+
+    return render_template("user.html", user=current_user, all_recipes=recipe_set, favorites=[])
+
+
+@app.route("/submit_rating", methods=["POST"])
+@login_required
+def submit_rating():
+    recipe_id = request.form.get("recipe_id")
+    rating = request.form.get("rating")
+
+    # 這裡可進行儲存到資料庫或驗證邏輯
+    if recipe_id and rating:
+        tablename = "recipe_ratings"
+        record_seq = access_db.query(tablename=tablename,
+                                     target={
+                                         "user_id": current_user.id,
+                                         "recipe_id": recipe_id,
+                                     })
+        if not record_seq:
+            access_db.insert_data(tablename=tablename, 
+                                  data={
+                                      "user_id": current_user.id,
+                                      "recipe_id": recipe_id,
+                                      "rating": rating,
+                                  })
+        else:
+            access_db.update_data(tablename=tablename, data={"rating": rating},
+                                  target={
+                                    "user_id": current_user.id,
+                                    "recipe_id": recipe_id,
+                                  })
+        r_name = access_db.query(tablename="Recipes", target={"recipe_id": recipe_id})
+        flash(f"成功為食譜 {r_name[0][1]} 給予 {rating} 分！")
+
+    else:
+        flash("請選擇食譜與分數後再送出。")
+
+    return redirect(url_for("user_page"))
 
 
 @app.route("/update_profile", methods=['POST'])
@@ -197,10 +276,10 @@ def update_profile():
             data["username"] = username
         if email != current_user.email:
             data["email"] = email
-        if not current_user.verify_password(new_password):
+        if new_password:
             current_user.password = new_password
             data["password"] = current_user.hashed_password
-        
+
         if len(data) > 0:
             access_db.update_data(tablename="Users",
                                   data=data,
