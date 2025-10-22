@@ -19,6 +19,22 @@ SQL script: [recipes_ingredients.sql](./recipes_ingredients.sql)
 ![DB_EER_diagram.png](./DB_EER_diagram.png)
 
 
+## Website
+首頁：
+![homepage.png](./homepage.png)
+
+註冊與登入
+![register.png](./register.png)
+![login.png](./login.png)
+
+搜尋食譜
+![search.png](./search.png)
+![search_result.png](./search_result.png)
+
+顯示食譜資訊
+![show_recipe.png](./show_recipe.png)
+
+
 ## TODO List
 
 1. 實時物件辨識並輸出結果至網站上
