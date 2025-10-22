@@ -44,3 +44,8 @@ SQL script: [recipes_ingredients.sql](./recipes_ingredients.sql)
 
 1. 實時物件辨識
 
+
+## Contributors
+* [Rex](https://github.com/RexIscodingnow)
+* [Tao](https://github.com/5142577aa)
+
