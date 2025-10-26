@@ -49,16 +49,49 @@
             </div>
         </form>
 
-        {% if rating_message %}
-            <p style="color: var(--primary); margin-top: 10px;">{{ rating_message }}</p>
-        {% endif %}
     </section>
 
     <hr style="margin: 30px 0;">
     <section class="user-section">
-        <h3>我的收藏食譜</h3>
+        <h3>上傳食材照片</h3>
 
-        {% if favorites %}
+        <form id="upload-form" action="{{ url_for('upload_ingred') }}" method="post" enctype="multipart/form-data">
+            <div class="user-form-group">
+                <label>上傳食譜照片（最多 5 張）</label>
+
+                <!-- 拖曳與貼上區 -->
+                <div id="drop-area" class="drop-area">
+                    <p>拖曳圖片到這裡，或點擊以下按鈕選取<br><small>(可貼上圖片)</small></p>
+                    <input type="file" id="photos" name="photos" accept="image/*" multiple hidden>
+                    <button type="button" id="select-btn" class="btn btn-outline">選擇圖片</button>
+                </div>
+
+                <small style="color:var(--muted)">支援 JPG、PNG，最多 5 張，每張建議小於 5MB。</small>
+            </div>
+            <!-- <div class="user-form-group">
+                <label for="photos">選擇食材照片（最多 5 張）</label>
+                <input type="file" id="photos" name="photos" multiple required>
+                <small style="color:var(--muted)">支援 JPG、PNG，最多 5 張，每張建議小於 5MB。</small>
+            </div> -->
+
+            <div id="preview-container" class="preview-container"></div>
+
+            <div class="modal-actions">
+                <button type="reset" id="clear-imgs-btn" class="btn btn-outline">清除</button>
+                <button type="submit" class="btn btn-primary">上傳</button>
+            </div>
+
+            <p id="upload-status" style="margin-top:10px; text-align:center; color:var(--muted)"></p>
+        </form>
+
+        {% if detect_result %}
+            <div class="alert alert-success">
+                偵測結果：{{ detect_result }}
+            </div>
+        {% endif %}
+        <!-- <h3>我的收藏食譜</h3> -->
+
+        <!-- {% if favorites %}
         <div class="recipe-grid">
             {% for recipe in favorites %}
             <div class="recipe-card">
@@ -71,7 +104,7 @@
         </div>
         {% else %}
         <p style="color:var(--muted)">目前還沒有收藏任何食譜～</p>
-        {% endif %}
+        {% endif %} -->
     </section>
 
     <!-- <section class="user-section">
