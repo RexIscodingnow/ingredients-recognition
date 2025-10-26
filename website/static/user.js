@@ -1,8 +1,25 @@
+/**
+ * Forms settings on the user page
+ */
+// 1. For edit user's profile
 const editBtn = document.getElementById("btn-edit-profile");
 const modalEdit = document.getElementById("user-edit-modal");
 const closeBtn = document.getElementById("user-edit-close");
 const cancelBtn = document.getElementById("user-edit-cancel");
 const user_edit_form = document.getElementById("user-edit-form");
+
+// 2. For upload the photos
+const photoInput = document.getElementById("photos");
+const selectBtn = document.getElementById("select-btn");
+const dropArea = document.getElementById("drop-area");
+const uploadForm = document.getElementById("upload-form");
+const uploadStatus = document.getElementById("upload-status");
+const previewContainer = document.getElementById("preview-container");
+const clearBtn = document.getElementById("clear-imgs-btn");
+const MAX_PHOTOS = 5;
+
+let selectedFiles = [];
+
 
 function showMessageOnEditForm(message, isSuccess = true) {
     let msgBox = document.getElementById('form-message');
@@ -18,6 +35,67 @@ function showMessageOnEditForm(message, isSuccess = true) {
     msgBox.style.color = isSuccess ? 'green' : 'red';
 }
 
+// ==============================================================================
+// ==============================================================================
+
+function renderPreview() {
+    previewContainer.innerHTML = "";
+
+    selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const div = document.createElement("div");
+            div.classList.add("preview-item");
+
+            const img = document.createElement("img");
+            img.src = e.target.result;
+
+            const btn = document.createElement("button");
+            btn.classList.add("remove-btn");
+            btn.innerHTML = "✕";
+            btn.addEventListener("click", () => removeImage(index));
+
+            div.appendChild(img);
+            div.appendChild(btn);
+            previewContainer.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    updateFileInput();
+}
+
+
+function handleFiles(files) {
+    const newFiles = files.filter(f => f.type.startsWith("image/"));
+    console.log(selectedFiles.length + newFiles.length);
+
+    if (selectedFiles.length + newFiles.length > MAX_PHOTOS) {
+        alert(`最多只能上傳 ${MAX_PHOTOS} 張圖片！`);
+        return;
+    }
+    selectedFiles = selectedFiles.concat(newFiles);
+    renderPreview();
+}
+
+
+function removeImage(index) {
+    selectedFiles.splice(index, 1);
+    renderPreview();
+}
+
+
+function updateFileInput() {
+    // 用 DataTransfer 重新建立 FileList
+    const dataTransfer = new DataTransfer();
+    selectedFiles.forEach(file => dataTransfer.items.add(file));
+    photoInput.files = dataTransfer.files;
+}
+
+// ==============================================================================
+// ==============================================================================
+
+/* The edit form for the user's profile */
 document.addEventListener("DOMContentLoaded", () => {
     const openModal = () => modalEdit.classList.add("active");
     const closeModal = () => {
@@ -78,5 +156,88 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessageOnEditForm('伺服器錯誤，請稍後再試', false);
         }
     });
+});
+
+// ==============================================================================
+// ==============================================================================
+
+/* 貼上圖片 */
+document.addEventListener("paste", (e) => {
+    const items = e.clipboardData.items;
+    const files = [];
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith("image/")) {
+            files.push(item.getAsFile());
+        }
+    }
+    if (files.length > 0) {
+        handleFiles(files);
+    }
+});
+
+selectBtn.addEventListener("click", () => photoInput.click());
+photoInput.addEventListener("change", (e) => {
+    handleFiles(Array.from(e.target.files));
+});
+
+/* 清除所有圖片 */
+clearBtn.addEventListener("click", () => {
+    selectedFiles = [];
+    previewContainer.innerHTML = "";
+    photoInput.value = "";
+});
+
+/* 拖曳圖片 */
+["dragenter", "dragover"].forEach(eventName => {
+    dropArea.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropArea.classList.add("dragover");
+    });
+});
+
+["dragleave", "drop"].forEach(eventName => {
+    dropArea.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropArea.classList.remove("dragover");
+    });
+});
+
+dropArea.addEventListener("drop", (e) => {
+    const files = Array.from(e.dataTransfer.files);
+    handleFiles(files);
+});
+
+uploadForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    if (selectedFiles.length === 0) {
+        e.preventDefault();
+        alert("請至少上傳一張圖片！");
+        return;
+    }
+
+    uploadStatus.textContent = "上傳中，請稍候...";
+    const formData = new FormData(uploadForm);
+
+    try {
+        const response = await fetch("/upload_ingred", {
+            method: "POST", body: formData
+        });
+
+        if (response.redirected) {
+            uploadStatus.textContent = "上傳成功！";
+            selectedFiles = [];
+            previewContainer.innerHTML = "";
+            photoInput.value = "";
+        } else {
+            uploadStatus.textContent = "上傳失敗，請稍後再試。";
+        }
+    } catch (err) {
+        console.error(err);
+        uploadStatus.textContent = "上傳失敗，請稍後再試。";
+    }
 });
 
