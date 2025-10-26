@@ -1,28 +1,22 @@
-from modules import (
-    app,
-    login_manager,
-    mail
-)
-from flask import (
-    render_template, 
-    request, 
-    redirect, 
-    url_for,
-    flash,
-    jsonify
-)
-from flask_login import (
-    login_user, 
-    login_required, 
-    current_user, 
-    logout_user
-)
+from modules import app, login_manager, mail
+from flask import render_template, request, redirect, url_for, flash, jsonify, session
+from flask_login import login_user, login_required, current_user, logout_user
 from flask_mail import Message
-from Users import User
-from RecipesIngredients import *
+from datetime import timedelta
 
+from Users import User
+from RecipesIngredients import Recipe, Ingredient, RecipeIngredients
+from detect_ingredients.detection import Detection, list_categories
+
+import json
 import config
 import access_db
+import cv2 as cv
+import numpy as np
+
+
+ZH_INGRED_PATH = "zh_ingredients.json"
+YOLO_MODEL_PATH = r"..\\detect_ingredients\runs\detect\train8\weights\best.pt"
 
 
 @login_manager.user_loader
@@ -89,6 +83,7 @@ def search():
     # 成功的話可回傳結果或導向新頁面
     return jsonify(success=True, message=f"找到 {len(results)} 筆結果", data=results)
 
+
 @app.route("/result")
 def query_result():
     keyword = request.args.get('q', 'No input')
@@ -124,8 +119,8 @@ def login():
     if not user.verify_password(password):
         return jsonify(success=False, message='登入失敗：密碼錯誤')
 
-    login_user(user)
-    return jsonify(success=True, message='登入成功！歡迎回來～', redirect_url=url_for("home"))
+    login_user(user, True, timedelta(hours=12))
+    return jsonify(success=True, message=f'登入成功！歡迎 {user.username} 回來～', redirect_url=url_for("home"))
 
 
 @app.route("/register", methods=["POST"])
@@ -205,6 +200,7 @@ def resetpassword(token):
 @app.route("/logout")
 @login_required
 def logout():
+    session.clear()
     logout_user()
     return redirect(url_for("home"))
 
@@ -213,16 +209,60 @@ def logout():
 @login_required
 def user_page():
     recipe_seq = access_db.query(tablename="Recipes")
-    recipe_set = set()
+    recipe_set = {
+        Recipe(recipe_id=recipe[0], recipe_name=recipe[1], recipe_info_url=recipe[2], cooking_step=recipe[3])
+        for recipe in recipe_seq
+    }
 
-    for recipe in recipe_seq:
-        r = Recipe(recipe_id=recipe[0],
-                   recipe_name=recipe[1],
-                   recipe_info_url=recipe[2],
-                   cooking_step=recipe[3])
-        recipe_set.add(r)
+    detect_result = session.pop("detection_result", None)
 
-    return render_template("user.html", user=current_user, all_recipes=recipe_set, favorites=[])
+    if detect_result is not None:
+        ingred_set = set(detect_result.get("classes"))
+        ingred_ls = [zh_dict[ingred] for ingred in ingred_set]
+        ingred_seq = access_db.query(tablename="Ingredients",
+                                    target={"ingredient_name": ingred_ls})
+        ingred_set = {
+            Ingredient(ingredient_id=ingred[0], ingredient_name=ingred[1])
+            for ingred in ingred_seq
+        }
+
+        for i in ingred_set:
+            print(i)
+
+    return render_template("user.html",
+                           user=current_user,
+                           all_recipes=recipe_set,
+                           favorites=[],
+                           detect_result=detect_result,
+                           )
+
+
+@app.route("/upload_ingred", methods=["POST"])
+@login_required
+def upload_ingred():
+    MAX_PHOTOS = 5
+    photos = request.files.getlist("photos")
+    print(len(photos))
+
+    if not photos:
+        flash("請選擇一張圖片")
+        return redirect(url_for("user_page"))
+
+    if len(photos) > MAX_PHOTOS:
+        flash(f"最多只能上傳 {MAX_PHOTOS} 張圖片")
+        return redirect(url_for("user_page"))
+
+    photobytes_ls = [p.read() for p in photos]
+    np_imgs = [np.frombuffer(p, np.int8) for p in photobytes_ls]
+    cv_imgs = [cv.imdecode(np_image, cv.IMREAD_COLOR) for np_image in np_imgs]
+    predict_res_ls = detection.predict(cv_imgs, conf=0.1)
+    classes, scores = list_categories(predict_res_ls)
+    session["detection_result"] = {
+        "classes": classes,
+        "scores": scores,
+    }
+
+    return redirect(url_for("user_page"))
 
 
 @app.route("/submit_rating", methods=["POST"])
@@ -291,4 +331,8 @@ def update_profile():
 
 
 if __name__ == "__main__":
+    with open(ZH_INGRED_PATH, encoding="utf-8") as f:
+        zh_dict = json.load(f)
+
+    detection = Detection(YOLO_MODEL_PATH)
     app.run(debug=True)
