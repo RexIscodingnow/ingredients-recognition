@@ -24,6 +24,8 @@ class RecipeIngredients:
         self.recipe_id = recipe_id
         self.ingredient_id = ingredient_id
 
+    def __str__(self):
+        return f"<RecipeIngredients object> ==> recipe_id: {self.recipe_id} , ingredient_id: {self.ingredient_id}"
 
 class RecipeRatings:
     """
@@ -36,6 +38,9 @@ class RecipeRatings:
         self.user_id = user_id
         self.recipe_id = recipe_id
 
+    def __str__(self):
+        return f"<RecipeRatings object> ==> rating: {self.rating} , user_id: {self.user_id} , recipe_id: {self.recipe_id}"
+
 
 class Recipe:
     def __init__(self, recipe_id, recipe_name, cooking_step, recipe_info_url):
@@ -44,6 +49,9 @@ class Recipe:
         self.cooking_step = cooking_step
         self.recipe_info_url = recipe_info_url
 
+    def __str__(self):
+        return f"<Recipe object> ==> id: {self.recipe_id} , name: {self.recipe_name}"
+
 
 class Ingredient:
     def __init__(self, ingredient_id, ingredient_name):
@@ -51,3 +59,5 @@ class Ingredient:
         self.ingredient_name = ingredient_name
 
 
+    def __str__(self):
+        return f"<Ingredient object> ==> id: {self.ingredient_id} , name: {self.ingredient_name}"
