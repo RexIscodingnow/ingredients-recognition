@@ -16,6 +16,8 @@ const uploadForm = document.getElementById("upload-form");
 const uploadStatus = document.getElementById("upload-status");
 const previewContainer = document.getElementById("preview-container");
 const clearBtn = document.getElementById("clear-imgs-btn");
+const detected = document.getElementById("detected");
+const show_detected_ingreds = document.getElementById("show-detected-ingreds");
 const MAX_PHOTOS = 5;
 
 let selectedFiles = [];
@@ -226,12 +228,22 @@ uploadForm.addEventListener("submit", async (e) => {
         const response = await fetch("/upload_ingred", {
             method: "POST", body: formData
         });
+        const result = await response.json();
 
-        if (response.redirected) {
+        // if (response.redirected) {
+        if (result.success) {
             uploadStatus.textContent = "上傳成功！";
             selectedFiles = [];
             previewContainer.innerHTML = "";
             photoInput.value = "";
+            detected.textContent = `${result.success}`;
+            
+            let classes = "";
+            let detect_result = result.detect_result["ingredients"];
+            for (let i = 0; i < detect_result.length; i++) {
+                classes += `${detect_result[i]}, `;
+            }
+            show_detected_ingreds.textContent = classes;
         } else {
             uploadStatus.textContent = "上傳失敗，請稍後再試。";
         }
