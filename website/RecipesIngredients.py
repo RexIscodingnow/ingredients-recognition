@@ -24,8 +24,14 @@ class RecipeIngredients:
         self.recipe_id = recipe_id
         self.ingredient_id = ingredient_id
 
+
     def __str__(self):
-        return f"<RecipeIngredients object> ==> recipe_id: {self.recipe_id} , ingredient_id: {self.ingredient_id}"
+        return f"<RecipeIngredients object> recipe_id = {self.recipe_id}, ingredient_id = {self.ingredient_id}"
+
+
+    def __repr__(self):
+        return f"<RecipeIngredients object> recipe_id = {self.recipe_id}, ingredient_id = {self.ingredient_id}"
+
 
 class RecipeRatings:
     """
@@ -38,8 +44,13 @@ class RecipeRatings:
         self.user_id = user_id
         self.recipe_id = recipe_id
 
+
     def __str__(self):
-        return f"<RecipeRatings object> ==> rating: {self.rating} , user_id: {self.user_id} , recipe_id: {self.recipe_id}"
+        return f"<RecipeRatings object> rating = {self.rating}, user_id: {self.user_id} = recipe_id: {self.recipe_id}"
+
+
+    def __repr__(self):
+        return f"<RecipeRatings object> rating = {self.rating}, user_id: {self.user_id} = recipe_id: {self.recipe_id}"
 
 
 class Recipe:
@@ -49,8 +60,13 @@ class Recipe:
         self.cooking_step = cooking_step
         self.recipe_info_url = recipe_info_url
 
+
     def __str__(self):
-        return f"<Recipe object> ==> id: {self.recipe_id} , name: {self.recipe_name}"
+        return f"<Recipe object> recipe_id = {self.recipe_id}, recipe_name = {self.recipe_name}"
+
+
+    def __repr__(self):
+        return f"<Recipe object> recipe_id = {self.recipe_id}, recipe_name = {self.recipe_name}"
 
 
 class Ingredient:
@@ -60,4 +76,8 @@ class Ingredient:
 
 
     def __str__(self):
-        return f"<Ingredient object> ==> id: {self.ingredient_id} , name: {self.ingredient_name}"
+        return f"<Ingredient object> ingredient_id = {self.ingredient_id}, ingredient_name = {self.ingredient_name}"
+
+
+    def __repr__(self):
+        return f"<Ingredient object> ingredient_id = {self.ingredient_id}, ingredient_name = {self.ingredient_name}"
