@@ -16,7 +16,8 @@ import numpy as np
 
 
 ZH_INGRED_PATH = "zh_ingredients.json"
-YOLO_MODEL_PATH = r"..\\detect_ingredients\runs\detect\train8\weights\best.pt"
+# YOLO_MODEL_PATH = r"..\\detect_ingredients\runs\detect\train8\weights\best.pt"
+YOLO_MODEL_PATH = r"..\\finetune_chili_debug\weights\best.pt"
 
 
 @login_manager.user_loader
@@ -59,6 +60,29 @@ def sendEmail(subjectMsg='', email=None, filename='', token=None):
         html=render_template(filename, token=token)
     )
     mail.send(msg)
+
+
+def intersect_ingred_recipe(ingred_set: set[Ingredient],
+                            ri_dict: dict[int, set[RecipeIngredients]]) -> dict[float]:
+    """Return the ratio of the intersection between `ingredients` and `RecipeIngredients`
+
+    Args:
+        ingred_set: Set of `ingredients`
+        ri_dict: The `dict` that maps each `RecipeIngredients.recipe_id` to 
+                 a set of `RecipeIngredients.ingredient_id`
+
+    Returns:
+        dict: It maps each `RecipeIngredients.recipe_id` to the ratio of the intersection
+    """
+    ratios = {}
+    ingred_ids = set(i.ingredient_id for i in ingred_set)
+
+    for r_id, ri_obj_set in ri_dict.items():
+        ri_ingred_ids = set(ri.ingredient_id for ri in ri_obj_set)
+        intersection = ingred_ids.intersection(ri_ingred_ids)
+        ratios[r_id] = len(intersection) / len(ri_ingred_ids)
+
+    return ratios
 
 
 @app.route("/")
@@ -214,26 +238,11 @@ def user_page():
         for recipe in recipe_seq
     }
 
-    detect_result = session.pop("detection_result", None)
-
-    if detect_result is not None:
-        ingred_set = set(detect_result.get("classes"))
-        ingred_ls = [zh_dict[ingred] for ingred in ingred_set]
-        ingred_seq = access_db.query(tablename="Ingredients",
-                                    target={"ingredient_name": ingred_ls})
-        ingred_set = {
-            Ingredient(ingredient_id=ingred[0], ingredient_name=ingred[1])
-            for ingred in ingred_seq
-        }
-
-        for i in ingred_set:
-            print(i)
-
     return render_template("user.html",
                            user=current_user,
                            all_recipes=recipe_set,
                            favorites=[],
-                           detect_result=detect_result,
+                           detect_results=[]
                            )
 
 
@@ -242,27 +251,46 @@ def user_page():
 def upload_ingred():
     MAX_PHOTOS = 5
     photos = request.files.getlist("photos")
-    print(len(photos))
 
     if not photos:
         flash("請選擇一張圖片")
-        return redirect(url_for("user_page"))
+        return jsonify(success=False, detect_result={})
 
     if len(photos) > MAX_PHOTOS:
         flash(f"最多只能上傳 {MAX_PHOTOS} 張圖片")
-        return redirect(url_for("user_page"))
+        return jsonify(success=False, detect_result={})
 
+    detected = False
     photobytes_ls = [p.read() for p in photos]
     np_imgs = [np.frombuffer(p, np.int8) for p in photobytes_ls]
     cv_imgs = [cv.imdecode(np_image, cv.IMREAD_COLOR) for np_image in np_imgs]
-    predict_res_ls = detection.predict(cv_imgs, conf=0.1)
-    classes, scores = list_categories(predict_res_ls)
-    session["detection_result"] = {
-        "classes": classes,
-        "scores": scores,
-    }
+    detect_result = detection.predict(cv_imgs, conf=0.1)
+    classes, _ = list_categories(detect_result)
 
-    return redirect(url_for("user_page"))
+    if len(classes) > 0:
+        detected = True
+        ingred_set = set(classes)
+        ingred_ls = [zh_dict.get(ingred.lower()) for ingred in ingred_set]
+        ingred_seq = access_db.query(tablename="Ingredients", target={"ingredient_name": ingred_ls})
+        ingred_set = {Ingredient(ingredient_id=ingred[0], ingredient_name=ingred[1]) for ingred in ingred_seq}
+
+        ri_dict = {}
+        recipe_ingred_seq = access_db.query(tablename="RecipeIngredients")
+        for r, i in recipe_ingred_seq:
+            if ri_dict.get(r) is None:
+                ri_dict[r] = set()
+
+            ri_dict[r].add(RecipeIngredients(recipe_id=r, ingredient_id=i))
+
+        ratio_dict = intersect_ingred_recipe(ingred_set, ri_dict)
+        ratio_dict = dict(sorted(ratio_dict.items(), key=lambda x: x[1], reverse=True))
+
+        print(classes)
+        print(ingred_ls)
+        print(ingred_set)
+        print(ratio_dict)
+
+    return jsonify(success=detected, detect_result={"ingredients": list(set(classes))})
 
 
 @app.route("/submit_rating", methods=["POST"])
