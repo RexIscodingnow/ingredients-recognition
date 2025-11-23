@@ -1,0 +1,1 @@
+[16536] 20 Nov 12:34:43.582 # Creating Server TCP listening socket 127.0.0.1:6379: bind: No error
