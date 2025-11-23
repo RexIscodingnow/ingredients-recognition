@@ -16,8 +16,9 @@ const uploadForm = document.getElementById("upload-form");
 const uploadStatus = document.getElementById("upload-status");
 const previewContainer = document.getElementById("preview-container");
 const clearBtn = document.getElementById("clear-imgs-btn");
-const detected = document.getElementById("detected");
-const show_detected_ingreds = document.getElementById("show-detected-ingreds");
+// const detected = document.getElementById("detected");
+// const show_detected_ingreds = document.getElementById("show-detected-ingreds");
+// const show_recommend_recipes = document.getElementById("show-recommend-recipes");
 const MAX_PHOTOS = 5;
 
 let selectedFiles = [];
@@ -236,14 +237,31 @@ uploadForm.addEventListener("submit", async (e) => {
             selectedFiles = [];
             previewContainer.innerHTML = "";
             photoInput.value = "";
-            detected.textContent = `${result.success}`;
-            
-            let classes = "";
-            let detect_result = result.detect_result["ingredients"];
-            for (let i = 0; i < detect_result.length; i++) {
-                classes += `${detect_result[i]}, `;
-            }
-            show_detected_ingreds.textContent = classes;
+
+            let recommend_ids = result.detect_result["recommend_ids"];
+
+            setTimeout(async () => {
+                try {
+                    if (recommend_ids.length === 0) {
+                        alert("抱歉！目標的食材與食譜尚未收錄");
+                    }
+
+                    const response = await fetch("/search", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ q: recommend_ids })
+                    });
+ 
+                    const result = await response.json();
+                    window.location.href = `/result?token=${encodeURIComponent(result.token)}`;
+                } catch (err) {
+                    console.error("搜尋失敗:", err);
+                    alert("搜尋時發生錯誤，請稍後再試。");
+                }
+            }, 1500);
+
         } else {
             uploadStatus.textContent = "上傳失敗，請稍後再試。";
         }

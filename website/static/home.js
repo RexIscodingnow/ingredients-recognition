@@ -15,10 +15,7 @@ searchBtn.addEventListener("click", async () => {
 
         const result = await response.json();
 
-        if (!result.success) {
-            alert(result.message || "找不到相關食譜。");
-        }
-        window.location.href = `/result?q=${encodeURIComponent(query)}`;
+        window.location.href = `/result?token=${encodeURIComponent(result.token)}`;
     } catch (err) {
         console.error("搜尋失敗:", err);
         alert("搜尋時發生錯誤，請稍後再試。");
