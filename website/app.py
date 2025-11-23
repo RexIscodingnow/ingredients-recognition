@@ -18,8 +18,7 @@ import cv2 as cv
 import numpy as np
 
 
-ZH_INGRED_PATH = "zh_ingredients.json"
-# YOLO_MODEL_PATH = r"..\\detect_ingredients\runs\detect\train8\weights\best.pt"
+ZH_INGRED_PATH = r"website\zh_ingredients.json"
 YOLO_MODEL_PATH = r"finetune_chili_debug\weights\best.pt"
 
 redis_client = RedisClient.get_instance()
