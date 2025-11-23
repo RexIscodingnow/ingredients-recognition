@@ -1,5 +1,5 @@
 from modules import app, login_manager, mail
-from flask import render_template, request, redirect, url_for, flash, jsonify, session
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, current_app
 from flask_login import login_user, login_required, current_user, logout_user
 from flask_mail import Message
 from datetime import timedelta
@@ -7,7 +7,10 @@ from datetime import timedelta
 from Users import User
 from RecipesIngredients import Recipe, Ingredient, RecipeIngredients
 from detect_ingredients.detection import Detection, list_categories
+from recommend_sys.cache_radis import RedisClient
+from recommend_sys.recommender import get_recommend
 
+import uuid
 import json
 import config
 import access_db
@@ -17,17 +20,15 @@ import numpy as np
 
 ZH_INGRED_PATH = "zh_ingredients.json"
 # YOLO_MODEL_PATH = r"..\\detect_ingredients\runs\detect\train8\weights\best.pt"
-YOLO_MODEL_PATH = r"..\\finetune_chili_debug\weights\best.pt"
+YOLO_MODEL_PATH = r"finetune_chili_debug\weights\best.pt"
+
+redis_client = RedisClient.get_instance()
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    """
-    回傳給 LoginManager 底下的 user_loader
-    登入時要做驗證使用者 der~
-    """
-    # 回傳使用者資訊
     query_seq = access_db.query(tablename="Users", target={"user_id": user_id})
+
     if len(query_seq) == 0:
         return None
     
@@ -63,13 +64,15 @@ def sendEmail(subjectMsg='', email=None, filename='', token=None):
 
 
 def intersect_ingred_recipe(ingred_set: set[Ingredient],
-                            ri_dict: dict[int, set[RecipeIngredients]]) -> dict[float]:
+                            ri_dict: dict[int, set[RecipeIngredients]],
+                            ignore_zero: bool = False) -> dict[float]:
     """Return the ratio of the intersection between `ingredients` and `RecipeIngredients`
 
     Args:
         ingred_set: Set of `ingredients`
         ri_dict: The `dict` that maps each `RecipeIngredients.recipe_id` to 
                  a set of `RecipeIngredients.ingredient_id`
+        ignore_zero: If set `True` then only insert nonzero ratio. Default set `False`.
 
     Returns:
         dict: It maps each `RecipeIngredients.recipe_id` to the ratio of the intersection
@@ -80,7 +83,13 @@ def intersect_ingred_recipe(ingred_set: set[Ingredient],
     for r_id, ri_obj_set in ri_dict.items():
         ri_ingred_ids = set(ri.ingredient_id for ri in ri_obj_set)
         intersection = ingred_ids.intersection(ri_ingred_ids)
-        ratios[r_id] = len(intersection) / len(ri_ingred_ids)
+        union = ingred_ids.union(ri_ingred_ids)
+        ratio = len(intersection) / len(union)      # Jaccard Index
+
+        if ignore_zero and ratio == 0.0:
+            continue
+
+        ratios[r_id] = ratio
 
     return ratios
 
@@ -93,30 +102,59 @@ def home():
 @app.route("/search", methods=["POST"])
 def search():
     data = request.get_json()
-    keyword = data.get("q", "").strip()
+    keyword = data.get("q", "")
 
-    # 查詢資料庫（示例）
-    results = access_db.query(
-        tablename="Recipes",
-        target={"recipe_name": f"%{keyword}%"},
-        fuzzy_search=True
-    )
+    if isinstance(keyword, str):
+        results = access_db.query(
+            tablename="Recipes",
+            target={"recipe_name": f"%{keyword.strip()}%"},
+            fuzzy_search=True
+        )
+    elif isinstance(keyword, list):
+        results = access_db.query(
+            tablename="Recipes",
+            target={"recipe_id": keyword if len(keyword) > 0 else "%%"},
+            fuzzy_search=True
+        )
+
     if not results:
         return jsonify(success=False, message="找不到相關食譜")
 
-    # 成功的話可回傳結果或導向新頁面
-    return jsonify(success=True, message=f"找到 {len(results)} 筆結果", data=results)
+    recipe_dicts = [{"recipe_id": r[0], "recipe_name": r[1], "recipe_info_url": r[2], "cooking_step": r[3]} for r in results]
+
+    token = uuid.uuid4().hex        # 32 chars
+    redis_key = f"search:{token}"
+    ttl_seconds = 60                # expire time
+    redis_client.setex(redis_key, ttl_seconds, json.dumps(recipe_dicts, ensure_ascii=False))
+
+    return jsonify(success=True, message=f"找到 {len(results)} 筆結果", token=token, count=len(recipe_dicts))
 
 
 @app.route("/result")
 def query_result():
-    keyword = request.args.get('q', 'No input')
-    recipes = access_db.query(
-        tablename="Recipes",
-        target={"recipe_name": f"%{keyword}%"},
-        fuzzy_search=True
-    )
-    recipe_lst = [Recipe(recipe_id=r[0], recipe_name=r[1], recipe_info_url=r[2], cooking_step=r[3]) for r in recipes]
+    token = request.args.get("token")
+    if not token:
+        return render_template("query_result.html", user=current_user, all_recipes=[], message="缺少 token 或已過期")
+
+    redis_key = f"search:{token}"
+    payload = redis_client.get(redis_key)
+
+    if not payload:
+        return render_template("query_result.html", user=current_user, all_recipes=[], message="查詢結果不存在或已過期")
+
+    try:
+        # 解析 JSON（payload 為字串）
+        recipe_dicts = json.loads(payload)
+
+    except Exception as e:
+        current_app.logger.exception("解析 redis payload 失敗")
+        return render_template("query_result.html", user=current_user, all_recipes=[], message="讀取資料錯誤")
+
+    redis_client.delete(redis_key)
+    recipe_lst = [
+        Recipe(recipe_id=r["recipe_id"], recipe_name=r["recipe_name"], recipe_info_url=r["recipe_info_url"], cooking_step=r["cooking_step"])
+        for r in recipe_dicts
+    ]
 
     return render_template("query_result.html", user=current_user, all_recipes=recipe_lst)
 
@@ -241,9 +279,7 @@ def user_page():
     return render_template("user.html",
                            user=current_user,
                            all_recipes=recipe_set,
-                           favorites=[],
-                           detect_results=[]
-                           )
+                           favorites=[])
 
 
 @app.route("/upload_ingred", methods=["POST"])
@@ -282,15 +318,22 @@ def upload_ingred():
 
             ri_dict[r].add(RecipeIngredients(recipe_id=r, ingredient_id=i))
 
-        ratio_dict = intersect_ingred_recipe(ingred_set, ri_dict)
+        ratio_dict = intersect_ingred_recipe(ingred_set, ri_dict, ignore_zero=True)
         ratio_dict = dict(sorted(ratio_dict.items(), key=lambda x: x[1], reverse=True))
+        recommend_ids = set()
 
-        print(classes)
-        print(ingred_ls)
-        print(ingred_set)
+        for r_id in ratio_dict.keys():
+            ids, _, _ = get_recommend(r_id, 5)
+            recommend_ids.update(ids)
+
         print(ratio_dict)
+        print(recommend_ids)
 
-    return jsonify(success=detected, detect_result={"ingredients": list(set(classes))})
+    return jsonify(success=detected,
+                   detect_result={
+                       "ingredients": list(set(classes)),
+                       "recommend_ids": list(map(int, recommend_ids))
+                   })
 
 
 @app.route("/submit_rating", methods=["POST"])
@@ -363,4 +406,4 @@ if __name__ == "__main__":
         zh_dict = json.load(f)
 
     detection = Detection(YOLO_MODEL_PATH)
-    app.run(debug=True)
+    app.run(host="0.0.0.0", debug=True)
